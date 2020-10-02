@@ -1,0 +1,115 @@
+---
+title: "Stats Overview"
+author: "Amanda Davis"
+date: "9/25/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(readxl)
+library(ggplot2)
+library(psych)
+library(psychTools)
+library(reshape2)
+library(janitor)
+library(tidyverse)
+library(directlabels)
+
+# set theme for maps
+# set defaults
+default_font_family <- 'Tahoma'
+default_font_color <- '#22211d'
+default_background_color <- '#f5f5f2'
+theme_map <- function(...) {
+  theme_minimal() +
+    theme(
+      text = element_text(family = default_font_family,
+                          color = default_font_color),
+      # remove all axes
+      axis.line = element_blank(),
+      # axis.text.x = element_blank(),
+      # axis.text.y = element_blank(),
+      axis.ticks = element_blank(),
+      # add a subtle grid
+      # panel.grid.major = element_line(color = "#dbdbd9", size = 0.2),
+      # panel.grid.minor = element_blank(),
+      # background colors
+      plot.background = element_rect(fill = default_background_color,
+                                     color = NA),
+      panel.background = element_rect(fill = default_background_color,
+                                      color = NA),
+      legend.background = element_rect(fill = default_background_color,
+                                       color = NA),
+      # borders and margins
+      plot.margin = unit(c(.5, .5, .2, .5), "cm"),
+      panel.border = element_blank(),
+      panel.spacing = unit(c(-.1, 0.2, .2, 0.2), "cm"),
+      # titles
+      legend.title = element_text(size = 9, margin = margin(-.2,0,.2,0, unit = 'cm')),
+      legend.text = element_text(size = 9, hjust = 0,
+                                 color = default_font_color),
+      legend.position="bottom", 
+      legend.box = "horizontal" ,
+      plot.title = element_text(size = 14, hjust = 0.5,
+                                color = default_font_color),
+      plot.subtitle = element_text(size = 9, hjust = 0.5,
+                                   color = default_font_color,
+                                   margin = margin(b = .5,
+                                                   t = 0,
+                                                   l = 2,
+                                                   unit = "cm"),
+                                   debug = F),
+      # captions
+      plot.caption = element_text(size = 7,
+                                  hjust = .5,
+                                  margin = margin(t = 0.2,
+                                                  b = 0,
+                                                  unit = "cm"),
+                                  color = "#939184"),
+      ...
+    )
+}
+```
+
+```{r data, include=FALSE}
+# get data and organize it
+internet_usage <- read_excel("Internet Usage downloaded 08.24.20 (World Bank)/internet_usage.xls")
+
+# useful way to rename one specific column
+colnames(internet_usage)[1] <- "country_name"
+
+# countries of interest
+countries <- cs(Morocco, "United Kingdom", France, Estonia, Qatar, Singapore, "New Zealand")
+
+internet_usage_selection <- as.data.frame(t(subset(internet_usage, country_name %in% countries)[, -c(2, 3, 4)]))
+# make country names the header
+internet_usage_selection <- row_to_names(internet_usage_selection, row_number = 1) 
+# make years (currently as rownames) to their own column
+internet_usage_selection$year <- as.numeric(row.names(internet_usage_selection))
+# we don't care about the years before the internet existed
+internet_usage_selection <- subset(internet_usage_selection, subset = year > 1989)
+```
+
+## Individuals Using the Internet
+
+```{r internet_plot, echo=FALSE, warning=FALSE}
+ggplot(internet_usage_selection, aes(x = year)) +
+  # ylim(0, 100) +
+  geom_line(aes(y = as.numeric(as.character(Morocco))), group = 1, color = 'red') + 
+  geom_line(aes(y = as.numeric(as.character(Estonia))), group = 1, color = 'blue') +
+  geom_line(aes(y = as.numeric(as.character(France))), group = 1, color = 'pink') +
+  geom_line(aes(y = as.numeric(as.character(Qatar))), group = 1, color = 'green') +
+  geom_line(aes(y = as.numeric(as.character(`United Kingdom`))), group = 1, color = 'gray') +
+  geom_line(aes(y = as.numeric(as.character(`New Zealand`))), group = 1, color = 'orange') +
+  geom_line(aes(y = as.numeric(as.character(Singapore))), group = 1, color = 'black') +
+  labs(title = "Individuals using the Internet 1990-2018 (% of population)", subtitle = "Internet users are individuals who have used the Internet (from any location) in the last 3 months.\n The Internet can be used via a computer, mobile phone, personal digital assistant, games machine, digital TV etc.", y = "Individuals using the Internet (% of population)", x = "Year", caption = "Source: World Bank 2020, Data: International Telecommunication Union, World Telecommunication/ICT Development Report and database") +
+  geom_text(x= 2019, y = 82.04319, label = "France", size = 3, color= "pink") +
+  geom_text(x= 2019, y = 64.80387, label = "Morocco", size = 3, color= "red") +
+  geom_text(x= 2019, y = 88.16564, label = "Singapore", size = 3, color= "black") +
+  geom_text(x= 2019, y = 94.89674, label = "UK", size = 3, color= "gray") +
+  geom_text(x= 2018, y = 90.81109, label = "New Zealand", size = 3, color= "orange") +
+  geom_text(x= 2019, y = 89.35701, label = "Estonia", size = 3, color= "blue") +
+  geom_text(x= 2019, y = 99.65285, label = "Qatar", size = 3, color= "green") +
+  theme_map()
+```
+
