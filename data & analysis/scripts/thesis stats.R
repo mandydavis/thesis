@@ -97,7 +97,7 @@ theme_pie <- function(...) {
                                  color = default_font_color),
       legend.position="top", 
       legend.box = "horizontal" ,
-      plot.title = element_text(size = 14, hjust = 0.5,
+      plot.title = element_text(size = 9, hjust = 0.5,
                                 color = default_font_color),
       plot.subtitle = element_text(size = 9, hjust = 0.5,
                                    color = default_font_color,
@@ -133,11 +133,6 @@ internet_usage_selection$year <- as.numeric(row.names(internet_usage_selection))
 # we don't care about the years before the internet existed
 internet_usage_selection <- subset(internet_usage_selection, subset = year > 1989)
 
-# internet <- internet_usage_selection %>%
-#   select(date, psavert, uempmed) %>%
-#   gather(key = "variable", value = "value", -date)
-
-
 # plot internet usage for my 7 countries from 1990-2020:
 internet <- ggplot(internet_usage_selection, aes(x = year)) +
   # ylim(0, 100) +
@@ -161,8 +156,8 @@ internet <- ggplot(internet_usage_selection, aes(x = year)) +
 
 
 ####### visualize degree popularity (what % of all women and men tertiary graduates studied ICT?):
-percent_of_women <- read.csv("./data/percent_of_women.csv")
-percent_of_men <- read.csv("./data/percent_of_men.csv")
+percent_of_women <- read.csv("./data & analysis/data/percent_of_women.csv")
+percent_of_men <- read.csv("./data & analysis/data/percent_of_men.csv")
 
 # munge data [** keep in mind this is averaging across years **]
 percent_of_women <- subset(percent_of_women, Indicator == 'Percentage of female graduates from tertiary education graduating from Information and Communication Technologies programmes, female (%)')
@@ -183,7 +178,7 @@ percent_of_gender <- inner_join(percent_of_women, percent_of_men, by = "iso_a3")
 # Morocco Gender Ratio of Tertiary ICT Degrees Awarded
 
 # load ICT data
-ict_raw <- read.csv("./data/ict.csv")
+ict_raw <- read.csv("./data & analysis/data/ict.csv")
 # the distinct country codes in case you need them
 ict_countries <- levels(ict_raw[,'LOCATION'])
 # get average across all years that each country has data for (2013-2019)
@@ -292,6 +287,60 @@ country_pie_charts("EST")
 country_pie_charts("NZL")
 country_pie_charts("GBR")
 country_pie_charts("FRA")
+
+
+###    change over time    ###
+country_codes <- c("QAT","MAR","SGP","EST","NZL","GBR","FRA")
+ICT_circ <- subset(ict_raw, subset = ict_raw$LOCATION %in% country_codes)
+# ICT_circ_df <- data.frame(row.names = c("QAT","MAR","SGP","EST","NZL","GBR","FRA"))
+# ICT_circ_df <- t(ICT_circ_df)
+ICT_circ_df <- data.frame(row.names = c(2013:2018))
+
+ICT_circ_df$QAT <- NA
+ICT_circ_df$MAR <- NA
+ICT_circ_df$SGP <- NA
+ICT_circ_df$EST <- NA
+ICT_circ_df$NZL <- NA
+ICT_circ_df$GBR <- NA
+ICT_circ_df$FRA <- NA
+
+for (country_code in colnames(ICT_circ_df)) {
+  country_years <- subset(ICT_circ$TIME, ICT_circ$LOCATION == country_code)
+  for (year in strtoi(rownames(ICT_circ_df))) {
+    if(year %in% country_years) {
+      country_rows <- subset(ICT_circ, subset = ICT_circ$LOCATION==country_code)
+      ICT_circ_df[year,country_code] <- subset(country_rows, subset = country_rows$TIME==year)$Value
+    }
+  }
+}
+
+# chop off the rest of the rows
+ICT_circ_df <- ICT_circ_df[2013:2018,]
+rownames(ICT_circ_df) <- c(2013:2018)
+
+ICT_circ_df$year <- as.numeric(row.names(ICT_circ_df))
+
+
+
+# plot ICT (women) graduation rates usage for my 7 countries using the years available:
+ICT_change <- ggplot(ICT_circ_df, aes(x = year)) +
+  # ylim(0, 100) +
+  geom_line(aes(y = as.numeric(as.character(MAR))), group = 1, color = 'red') + 
+  geom_line(aes(y = as.numeric(as.character(EST))), group = 1, color = 'blue') +
+  geom_line(aes(y = as.numeric(as.character(FRA))), group = 1, color = 'pink') +
+  geom_line(aes(y = as.numeric(as.character(QAT))), group = 1, color = 'green') +
+  geom_line(aes(y = as.numeric(as.character(GBR))), group = 1, color = 'gray') +
+  geom_line(aes(y = as.numeric(as.character(NZL))), group = 1, color = 'orange') +
+  geom_line(aes(y = as.numeric(as.character(SGP))), group = 1, color = 'black') +
+  labs(title = "Change in the percent of ICT tertiary graduates who are women over time", subtitle = "subtitle goes here", y= "percent of ICT tertiary graduates who are women") +
+  geom_text(x= 2016.25, y = 16.45824, label = "France", size = 3, color= "pink") +
+  geom_text(x= 2017.25, y = 41.28349, label = "Morocco", size = 3, color= "red") +
+  geom_text(x= 2017.3, y = 32.22160, label = "Singapore", size = 3, color= "black") +
+  geom_text(x= 2016.15, y = 19.38466, label = "UK", size = 3, color= "gray") +
+  geom_text(x= 2017.35, y = 23.10945, label = "New Zealand", size = 3, color= "orange") +
+  geom_text(x= 2017.25, y = 28.89201, label = "Estonia", size = 3, color= "blue") +
+  geom_text(x= 2018, y = 54.2, label = "Qatar", size = 3, color= "green") +
+  theme_map()
   
 
 

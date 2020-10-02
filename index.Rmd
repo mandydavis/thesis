@@ -1,5 +1,5 @@
 --- 
-title: "ICT Gender-Equality Paradox Re-Analysis"
+title: "ICT Gender-Equality Paradox"
 author: "Mandy Davis"
 date: "`r Sys.Date()`"
 site: bookdown::bookdown_site
@@ -12,20 +12,475 @@ github-repo: mandydavis/ict-gep-re-analysis
 description: "An overview and tour of the steps taken to re-analyze the ICT Gender-Equality Paradox."
 ---
 
-# Introduction
+```{r setup, include=FALSE}
+# packages needed for both SAPA.r and thesis stats.R
+library(readxl)
+library(ggplot2)
+library(psych)
+library(psychTools)
+library(reshape2)
+library(janitor)
+library(tidyverse)
+library(ggrepel)
+library(directlabels)
+library(ggforce)
+library(gridExtra)
+library(gtable)
+library(dplyr)
+library(forcats)
+require(devtools)
 
-In 2018, Stoet & Geary published a paper titled, "The Gender-Equality Paradox in Science, Technology, Engineering, and Mathematics Education." This paper was the first to introduce this idea of a gender-equality paradox in Science, Technology, Engineering, and Mathematics (STEM) education, and therefore gained traction in the popular media (e.g., @stoetGenderEqualityParadoxScience2018a). The STEM gender-equality paradox (STEM-GEP) represents the counter-intuitive, negative correlation between gender equality (as measured by the Global Gender Gap Index (GGGI)) and the percentage of STEM graduates who are women. That is, countries with higher gender equality tend to have a lower percentage of STEM graduates who are women.
+# necessary mapping packages
+theme_set(theme_bw())
+library("sf")
+library("rnaturalearth")
+library("rnaturalearthdata")
+library("rgeos")
+library(magrittr) # pipes
+library(lintr) # code linting
+library(raster) # raster handling (needed for relief)
+library(viridis) # viridis color scale
+library('dichromat')
+```
 
-These findings are controversial for multiple reasons. First, one can imagine how the results could used as evidence in support of politicized ideas about gender differences in the pursuit of STEM: in countries with higher gender equality, women presumably face fewer barriers to pursuing a STEM education, thus the low percentage of women STEM graduates could reflect women's choice to pursue other fields due to intrinsic factors like interest. Similarly, one might argue that the high percentage of women STEM graduates in countries with low gender equality reflects a choice to pursue STEM due to extrinsic factors like financial incentives.
+```{r themes, include = FALSE}
+# set theme for maps & pies
+# set defaults
+default_font_family <- 'Tahoma'
+default_font_color <- '#22211d'
+default_background_color <- '#f5f5f2'
+theme_map <- function(...) {
+  theme_minimal() +
+    theme(
+      text = element_text(family = default_font_family,
+                          color = default_font_color),
+      # remove all axes
+      axis.line = element_blank(),
+      # axis.text.x = element_blank(),
+      # axis.text.y = element_blank(),
+      axis.ticks = element_blank(),
+      # add a subtle grid
+      # panel.grid.major = element_line(color = "#dbdbd9", size = 0.2),
+      # panel.grid.minor = element_blank(),
+      # background colors
+      plot.background = element_rect(fill = default_background_color,
+                                     color = NA),
+      panel.background = element_rect(fill = default_background_color,
+                                      color = NA),
+      legend.background = element_rect(fill = default_background_color,
+                                       color = NA),
+      # borders and margins
+      plot.margin = unit(c(.5, .5, .2, .5), "cm"),
+      panel.border = element_blank(),
+      panel.spacing = unit(c(-.1, 0.2, .2, 0.2), "cm"),
+      # titles
+      legend.title = element_text(size = 9, margin = margin(-.2,0,.2,0, unit = 'cm')),
+      legend.text = element_text(size = 9, hjust = 0,
+                                 color = default_font_color),
+      legend.position="bottom", 
+      legend.box = "horizontal" ,
+      plot.title = element_text(size = 14, hjust = 0.5,
+                                color = default_font_color),
+      plot.subtitle = element_text(size = 9, hjust = 0.5,
+                                   color = default_font_color,
+                                   margin = margin(b = .5,
+                                                   t = 0,
+                                                   l = 2,
+                                                   unit = "cm"),
+                                   debug = F),
+      # captions
+      plot.caption = element_text(size = 7,
+                                  hjust = .5,
+                                  margin = margin(t = 0.2,
+                                                  b = 0,
+                                                  unit = "cm"),
+                                  color = "#939184"),
+      ...
+    )
+}
+theme_pie <- function(...) {
+  theme_minimal() +
+    theme(
+      text = element_text(family = default_font_family,
+                          color = default_font_color),
+      # remove all axes
+      axis.line = element_blank(),
+      axis.text.x = element_blank(),
+      axis.text.y = element_blank(),
+      axis.ticks = element_blank(),
+      # add a subtle grid
+      # panel.grid.major = element_line(color = "#dbdbd9", size = 0.2),
+      panel.grid.minor = element_blank(),
+      # background colors
+      plot.background = element_rect(fill = default_background_color,
+                                     color = NA),
+      panel.background = element_rect(fill = default_background_color,
+                                      color = NA),
+      legend.background = element_rect(fill = default_background_color,
+                                       color = NA),
+      # borders and margins
+      plot.margin = unit(c(.5, .5, .2, .5), "cm"),
+      panel.border = element_blank(),
+      panel.spacing = unit(c(-.1, 0.2, .2, 0.2), "cm"),
+      # titles
+      legend.title = element_blank(),
+      legend.text = element_text(size = 9, hjust = 0,
+                                 color = default_font_color),
+      legend.position="top", 
+      legend.box = "horizontal" ,
+      plot.title = element_text(size = 9, hjust = 0.5,
+                                color = default_font_color),
+      plot.subtitle = element_text(size = 9, hjust = 0.5,
+                                   color = default_font_color,
+                                   margin = margin(b = .5,
+                                                   t = 0,
+                                                   l = 2,
+                                                   unit = "cm"),
+                                   debug = F),
+      # captions
+      plot.caption = element_text(size = 7,
+                                  hjust = .5,
+                                  margin = margin(t = 0.2,
+                                                  b = 0,
+                                                  unit = "cm"),
+                                  color = "#939184"),
+      ...
+    )
+}
+```
 
-Secondly, Stoet & Geary's findings are controversial due to several errors in the original paper that have since been corrected, though these changes did not impact the conclusions of the paper. Richardson et al.'s [-@richardsonThereGenderEqualityParadox2020a] commentary article illuminates two major aspects of Stoet & Geary's [-@stoetGenderEqualityParadoxScience2018a]  STEM-GEP paper that merit consideration. Richardson et al. (2020) point out that the x-axis of the STEM-GEP was misidentified. The original paper included a graph with the x-axis labeled “Women Among STEM Graduates (%)", which has been corrected to “Propensity of Women to Graduate With STEM Degrees” in the updated, 2020 paper. The new label still evokes confusion, as "propensity" could be interpreted in various ways. An even more representative x-axis label would read, "Women Among STEM Graduates (%) When Adjusted for Differences in Graduation Numbers of Men and Women." The x-axis label was changed because the data used in that correlation were not, in fact, data concerning the percent of women among STEM graduates. Rather, the data used and what Stoet & Geary (2020) now call *propensity*, is an estimate of the percentage of women among STEM graduates after adjusting for equal graduation rates among men and women. 
+```{r SAPA, include=FALSE}
+load("./data & analysis/data/SAPA/SAPA.rdata")
+# rename the monster
+SAPA <- SAPAdata18aug2010thru7feb2017
+rm(SAPAdata18aug2010thru7feb2017)
+# reset ItemLists with the file Bill provided (running this line will replace the existing one from the earlier load)
+load("./data & analysis/data/SAPA/ItemLists.rda")
 
-Richardson et al. (2020) also bring attention to the importance of which gender equality index measure is used. When re-analyzing the data with the Basic Index of Gender Equality (BIGI), the correlation between percent of women among STEM graduates and gender equality ceases to exist. However, in a reply to Richardson et al., Stoet & Geary [-@stoetGenderEqualityParadoxPart2020a] argue that the BIGI (which they developed themselves) is not an appropriate index to compare to the STEM gender data, as the BIGI measures merely well-being and not empowerment. Richardson, who directs the GenderSci Lab at Harvard University, continues to write about this controversy in a series of blog posts on the lab's website, [GenderSci Lab Blog Series](https://www.genderscilab.org/blog/the-gendersci-lab-takes-on-the-gender-equality-paradox-hypothesis-introduction-and-primer).
+# country/participant count
+countries_tibble <- SAPA %>%
+  mutate(country = forcats::fct_explicit_na(country)) %>%
+  group_by(country) %>%
+  summarize(N = n()) %>%
+  arrange(desc(N))
 
-## The ICT Gender-Equality Paradox
-Using Stoet & Geary's (2018) paper as a launching pad, the UNESCO for the EQUALS Skills Coalition dedicated part of their 2019 report on digital skills and gender [@westBlushIfCould2019a] to a Thinkpiece introducing the Information and Communication Technology (ICT) version of the STEM-GEP, henceforth the ICT-GEP. ICT refers to education programs that one might conceptualize as technology programs and broadly refers to computer science and related programs. More specifically, UNESCO provides a definition^[UNESCO defines ICT education and training as "(1) the study of techniques and acquisition of skills to produce newspapers, radio/television programmes, films/videos, recorded music and graphic reproduction with ICT; (2) the study of the design and development of computer systems and computing environments; (3) the study of using computers and computer software and applications for different purposes; and (4) the study of planning, designing, developing, maintaining and monitoring electronic equipment, machinery and systems"] outlining four categories that qualify as ICT. The ICT-GEP follows the same trend as the STEM-GEP, that is, the higher the gender equality (GGGI) of a given country, the lower the percentage of ICT graduates who are women. Though UNESCO's analysis of the ICT-GEP mostly mirrors that of Stoet & Geary (2018), the ICT-GEP has not received criticism and undergone a re-analysis like the STEM-GEP has.  
+# countries with >= 500 participants
+countries_tibble_500 <- filter(countries_tibble, N >= 500)
 
-## The Present Research
-The ICT-GEP Thinkpiece lacks many details concerning the method of analysis; additionally, the ICT-GEP has only been measured using one correlation strategy. The present research aims to investigate the ICT-GEP data in order to fill those methodological disclosure gaps, as well as re-analyze the ICT-GEP using two alternative methods of correlating ICT data with GGGI data. 
+# a new version of the SAPA data, which includes only those participants who are from countries that have >= 500 total participants
+SAPA_500 <- subset(SAPA, SAPA$country %in% countries_tibble_500$country)
 
-Following from the three related, but disparate approaches, the present research asks, for the ICT-GEP, do the three approaches result in parallel results? 
+# merge SAPA_500 with GGGI data (we have SAPA data for 2010-2017, so select same years for GGGI)
+# update: there is no 2017 in the GGGI data (?), so the last year I include is 2016, as the SAPA data only goes through Feb 2017.
+ggi_raw <- read.csv("./data & analysis/data/ggi.csv", header = TRUE)
+# reduces the data frame to contain only the relevant data, aka the ggi index value
+ggi_index <- subset(ggi_raw, Indicator=='Overall Global Gender Gap Index' & Subindicator.Type== 'Index')
+# find average GGI from 2013-2018
+ggi_index$avg_ggi <- rowMeans(ggi_index[,10:16], na.rm = TRUE)
+```
+
+# Exploratory Data Analysis
+
+## ICT Graduation Trends (Country Comparison)
+```{r ICT_pies, echo=FALSE, warning=FALSE, message=FALSE}
+####### visualize degree popularity (what % of all women and men tertiary graduates studied ICT?):
+percent_of_women <- read.csv("./data & analysis/data/percent_of_women.csv")
+percent_of_men <- read.csv("./data & analysis/data/percent_of_men.csv")
+
+# munge data [** keep in mind this is averaging across years **]
+percent_of_women <- subset(percent_of_women, Indicator == 'Percentage of female graduates from tertiary education graduating from Information and Communication Technologies programmes, female (%)')
+percent_of_women <- aggregate(percent_of_women[,'Value'], list(percent_of_women$LOCATION), mean)
+colnames(percent_of_women) <- c("iso_a3", "percent_of_women")
+
+# do the same for the men
+percent_of_men <- subset(percent_of_men, Indicator == 'Percentage of male graduates from tertiary education graduating from Information and Communication Technologies programmes, male (%)')
+percent_of_men <- aggregate(percent_of_men[,'Value'], list(percent_of_men$LOCATION), mean)
+colnames(percent_of_men) <- c("iso_a3", "percent_of_men")
+
+# combine the percent_of_women and percent_of_men tables
+percent_of_gender <- inner_join(percent_of_women, percent_of_men, by = "iso_a3")
+
+# load ICT data
+ict_raw <- read.csv("./data & analysis/data/ict.csv")
+# the distinct country codes in case you need them
+ict_countries <- levels(ict_raw[,'LOCATION'])
+# get average across all years that each country has data for (2013-2019)
+ict_averages <- aggregate(ict_raw[,'Value'], list(ict_raw$LOCATION), mean)
+# rename columns
+colnames(ict_averages) <- c('iso_a3', 'average_ICT_w')
+
+# ---------------------------
+# Qatar 
+# ---------------------------
+
+average_ICT_w <- subset(ict_averages, subset = ict_averages["iso_a3"] == "QAT")$average_ICT_w
+QAT_percent_ICT <- data.frame("gender" = c("Women", "Men"), "percent" = c(average_ICT_w, 100 - average_ICT_w))
+
+# (load percent_of_gender data) create tables that will work well to construct percent_of_m and percent_of_w pie charts
+QAT_percent_w <- subset(percent_of_gender, subset = percent_of_gender["iso_a3"] == "QAT")$percent_of_women
+QAT_percent_of_w = data.frame("degree" = c("ICT", "Other Degree"), "percent" = c(QAT_percent_w, 100 - QAT_percent_w))
+QAT_percent_m <- subset(percent_of_gender, subset = percent_of_gender["iso_a3"] == "QAT")$percent_of_men
+QAT_percent_of_m = data.frame("degree" = c("ICT", "Other Degree"), "percent" = c(QAT_percent_m, 100 - QAT_percent_m))
+
+# create pie chart (% of ICT graduates who are women)
+QAT_p_of_ICT <- ggplot(QAT_percent_ICT, aes(x = "", y = percent, fill = gender)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y", start = 0) + 
+  geom_label(aes(label = paste((round(percent, digits = 1)), "%")), position = position_stack(vjust = 0.5), show.legend = FALSE, size = 5) +
+  scale_fill_manual(values = c("#1FBFC3", "#F57670")) +
+  labs(x= NULL, y = NULL, title = "% of ICT tertiary graduates who are..") +
+  theme_pie()
+
+# Qatar percent of women
+QAT_p_of_women_plot <- ggplot(QAT_percent_of_w, aes(x = "", y = percent, fill = degree)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y", start = 0) + 
+  geom_label(aes(label = paste((round(percent, digits = 1)), "%")), position = position_stack(vjust = 0.5), show.legend = FALSE, size = 5) +
+  scale_fill_manual(values = c("#6874E8", "#9F9FED")) +
+  labs(x= NULL, y = NULL, title = "% of women who pursued...") +
+  theme_pie()
+
+# Qatar percent of men
+QAT_p_of_men_plot <- ggplot(QAT_percent_of_m, aes(x = "", y = percent, fill = degree)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y", start = 0) + 
+  geom_label(aes(label = paste((round(percent, digits = 1)), "%")), position = position_stack(vjust = 0.5), show.legend = FALSE, size = 5) +
+  scale_fill_manual(values = c("#6874E8", "#9F9FED")) +
+  labs(x= NULL, y = NULL, title = "% of men who pursued...") +
+  theme_pie() 
+
+# ---------------------------
+# Morocco 
+# ---------------------------
+
+average_ICT_w <- subset(ict_averages, subset = ict_averages["iso_a3"] == "MAR")$average_ICT_w
+MAR_percent_ICT <- data.frame("gender" = c("Women", "Men"), "percent" = c(average_ICT_w, 100 - average_ICT_w))
+
+MAR_percent_w <- subset(percent_of_gender, subset = percent_of_gender["iso_a3"] == "MAR")$percent_of_women
+MAR_percent_of_w = data.frame("degree" = c("ICT", "Other Degree"), "percent" = c(MAR_percent_w, 100 - MAR_percent_w))
+MAR_percent_m <- subset(percent_of_gender, subset = percent_of_gender["iso_a3"] == "MAR")$percent_of_men
+MAR_percent_of_m = data.frame("degree" = c("ICT", "Other Degree"), "percent" = c(MAR_percent_m, 100 - MAR_percent_m))
+
+# create pie chart (% of ICT graduates who are women)
+MAR_p_of_ICT <- ggplot(MAR_percent_ICT, aes(x = "", y = percent, fill = gender)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y", start = 0) + 
+  geom_label(aes(label = paste((round(percent, digits = 1)), "%")), position = position_stack(vjust = 0.5), show.legend = FALSE, size = 5) +
+  scale_fill_manual(values = c("#1FBFC3", "#F57670")) +
+  labs(x= NULL, y = NULL, title = "% of ICT tertiary graduates who are..") +
+  theme_pie()
+
+# Qatar percent of women
+MAR_p_of_women_plot <- ggplot(MAR_percent_of_w, aes(x = "", y = percent, fill = degree)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y", start = 0) + 
+  geom_label(aes(label = paste((round(percent, digits = 1)), "%")), position = position_stack(vjust = 0.5), show.legend = FALSE, size = 5) +
+  scale_fill_manual(values = c("#6874E8", "#9F9FED")) +
+  labs(x= NULL, y = NULL, title = "% of women who pursued...") +
+  theme_pie()
+
+# Qatar percent of men
+MAR_p_of_men_plot <- ggplot(MAR_percent_of_m, aes(x = "", y = percent, fill = degree)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y", start = 0) + 
+  geom_label(aes(label = paste((round(percent, digits = 1)), "%")), position = position_stack(vjust = 0.5), show.legend = FALSE, size = 5) +
+  scale_fill_manual(values = c("#6874E8", "#9F9FED")) +
+  labs(x= NULL, y = NULL, title = "% of men who pursued...") +
+  theme_pie() 
+
+# ---------------------------
+# United Kingdom 
+# ---------------------------
+
+average_ICT_w <- subset(ict_averages, subset = ict_averages["iso_a3"] == "GBR")$average_ICT_w
+GBR_percent_ICT <- data.frame("gender" = c("Women", "Men"), "percent" = c(average_ICT_w, 100 - average_ICT_w))
+
+GBR_percent_w <- subset(percent_of_gender, subset = percent_of_gender["iso_a3"] == "GBR")$percent_of_women
+GBR_percent_of_w = data.frame("degree" = c("ICT", "Other Degree"), "percent" = c(GBR_percent_w, 100 - GBR_percent_w))
+GBR_percent_m <- subset(percent_of_gender, subset = percent_of_gender["iso_a3"] == "GBR")$percent_of_men
+GBR_percent_of_m = data.frame("degree" = c("ICT", "Other Degree"), "percent" = c(GBR_percent_m, 100 - GBR_percent_m))
+
+# create pie chart (% of ICT graduates who are women)
+GBR_p_of_ICT <- ggplot(GBR_percent_ICT, aes(x = "", y = percent, fill = gender)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y", start = 0) + 
+  geom_label(aes(label = paste((round(percent, digits = 1)), "%")), position = position_stack(vjust = 0.5), show.legend = FALSE, size = 5) +
+  scale_fill_manual(values = c("#1FBFC3", "#F57670")) +
+  labs(x= NULL, y = NULL, title = "% of ICT tertiary graduates who are..") +
+  theme_pie()
+
+# Qatar percent of women
+GBR_p_of_women_plot <- ggplot(GBR_percent_of_w, aes(x = "", y = percent, fill = degree)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y", start = 0) + 
+  geom_label(aes(label = paste((round(percent, digits = 1)), "%")), position = position_stack(vjust = 0.5), show.legend = FALSE, size = 5) +
+  scale_fill_manual(values = c("#6874E8", "#9F9FED")) +
+  labs(x= NULL, y = NULL, title = "% of women who pursued...") +
+  theme_pie()
+
+# Qatar percent of men
+GBR_p_of_men_plot <- ggplot(GBR_percent_of_m, aes(x = "", y = percent, fill = degree)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y", start = 0) + 
+  geom_label(aes(label = paste((round(percent, digits = 1)), "%")), position = position_stack(vjust = 0.5), show.legend = FALSE, size = 5) +
+  scale_fill_manual(values = c("#6874E8", "#9F9FED")) +
+  labs(x= NULL, y = NULL, title = "% of men who pursued...") +
+  theme_pie() 
+
+
+```
+
+### Qatar
+```{r qatar_pie, echo=FALSE, warning=FALSE, message=FALSE}
+grid.arrange(QAT_p_of_ICT, QAT_p_of_women_plot, QAT_p_of_men_plot, nrow = 1)
+```
+
+### Morocco
+```{r morocco_pie, echo=FALSE, warning=FALSE, message=FALSE}
+grid.arrange(MAR_p_of_ICT, MAR_p_of_women_plot, MAR_p_of_men_plot, nrow = 1)
+```
+
+### United Kingdom
+```{r uk_pie, echo=FALSE, warning=FALSE, message=FALSE}
+grid.arrange(GBR_p_of_ICT, GBR_p_of_women_plot, GBR_p_of_men_plot, nrow = 1)
+```
+
+## ICT Graduation Trends (Change Over Time)
+```{r ICT_change, echo=FALSE, warning=FALSE}
+###    change over time    ###
+country_codes <- c("QAT","MAR","SGP","EST","NZL","GBR","FRA")
+ICT_circ <- subset(ict_raw, subset = ict_raw$LOCATION %in% country_codes)
+# ICT_circ_df <- data.frame(row.names = c("QAT","MAR","SGP","EST","NZL","GBR","FRA"))
+# ICT_circ_df <- t(ICT_circ_df)
+ICT_circ_df <- data.frame(row.names = c(2013:2018))
+
+ICT_circ_df$QAT <- NA
+ICT_circ_df$MAR <- NA
+ICT_circ_df$SGP <- NA
+ICT_circ_df$EST <- NA
+ICT_circ_df$NZL <- NA
+ICT_circ_df$GBR <- NA
+ICT_circ_df$FRA <- NA
+
+for (country_code in colnames(ICT_circ_df)) {
+  country_years <- subset(ICT_circ$TIME, ICT_circ$LOCATION == country_code)
+  for (year in strtoi(rownames(ICT_circ_df))) {
+    if(year %in% country_years) {
+      country_rows <- subset(ICT_circ, subset = ICT_circ$LOCATION==country_code)
+      ICT_circ_df[year,country_code] <- subset(country_rows, subset = country_rows$TIME==year)$Value
+    }
+  }
+}
+
+# chop off the rest of the rows
+ICT_circ_df <- ICT_circ_df[2013:2018,]
+rownames(ICT_circ_df) <- c(2013:2018)
+
+ICT_circ_df$year <- as.numeric(row.names(ICT_circ_df))
+
+
+
+# plot ICT (women) graduation rates usage for my 7 countries using the years available:
+ICT_change <- ggplot(ICT_circ_df, aes(x = year)) +
+  # ylim(0, 100) +
+  geom_line(aes(y = as.numeric(as.character(MAR))), group = 1, color = 'red') + 
+  geom_line(aes(y = as.numeric(as.character(EST))), group = 1, color = 'blue') +
+  geom_line(aes(y = as.numeric(as.character(FRA))), group = 1, color = 'pink') +
+  geom_line(aes(y = as.numeric(as.character(QAT))), group = 1, color = 'green') +
+  geom_line(aes(y = as.numeric(as.character(GBR))), group = 1, color = 'gray') +
+  geom_line(aes(y = as.numeric(as.character(NZL))), group = 1, color = 'orange') +
+  geom_line(aes(y = as.numeric(as.character(SGP))), group = 1, color = 'black') +
+  labs(title = "Change in the percent of ICT tertiary graduates who are women over time", subtitle = "subtitle goes here", y= "percent of ICT tertiary graduates who are women") +
+  geom_text(x= 2016.25, y = 16.45824, label = "France", size = 3, color= "pink") +
+  geom_text(x= 2017.25, y = 41.28349, label = "Morocco", size = 3, color= "red") +
+  geom_text(x= 2017.3, y = 32.22160, label = "Singapore", size = 3, color= "black") +
+  geom_text(x= 2016.15, y = 19.38466, label = "UK", size = 3, color= "gray") +
+  geom_text(x= 2017.35, y = 23.10945, label = "New Zealand", size = 3, color= "orange") +
+  geom_text(x= 2017.25, y = 28.89201, label = "Estonia", size = 3, color= "blue") +
+  geom_text(x= 2018, y = 54.2, label = "Qatar", size = 3, color= "green") +
+  theme_map()
+
+ICT_change
+
+```
+
+## Internet Usage
+
+```{r internet, echo=FALSE, warning=FALSE}
+internet_usage <- read_excel("./data & analysis/data/Internet Usage downloaded 08.24.20 (World Bank)/internet_usage.xls")
+
+# useful way to rename one specific column
+colnames(internet_usage)[1] <- "country_name"
+
+# countries of interest
+countries <- cs(Morocco, "United Kingdom", France, Estonia, Qatar, Singapore, "New Zealand")
+
+internet_usage_selection <- as.data.frame(t(subset(internet_usage, country_name %in% countries)[, -c(2, 3, 4)]))
+# make country names the header
+internet_usage_selection <- row_to_names(internet_usage_selection, row_number = 1) 
+# make years (currently as rownames) to their own column
+internet_usage_selection$year <- as.numeric(row.names(internet_usage_selection))
+# we don't care about the years before the internet existed
+internet_usage_selection <- subset(internet_usage_selection, subset = year > 1989)
+
+# internet <- internet_usage_selection %>%
+#   select(date, psavert, uempmed) %>%
+#   gather(key = "variable", value = "value", -date)
+
+
+# plot internet usage for my 7 countries from 1990-2020:
+internet <- ggplot(internet_usage_selection, aes(x = year)) +
+  # ylim(0, 100) +
+  geom_line(aes(y = as.numeric(as.character(Morocco))), group = 1, color = 'red') + 
+  geom_line(aes(y = as.numeric(as.character(Estonia))), group = 1, color = 'blue') +
+  geom_line(aes(y = as.numeric(as.character(France))), group = 1, color = 'pink') +
+  geom_line(aes(y = as.numeric(as.character(Qatar))), group = 1, color = 'green') +
+  geom_line(aes(y = as.numeric(as.character(`United Kingdom`))), group = 1, color = 'gray') +
+  geom_line(aes(y = as.numeric(as.character(`New Zealand`))), group = 1, color = 'orange') +
+  geom_line(aes(y = as.numeric(as.character(Singapore))), group = 1, color = 'black') +
+  labs(title = "Individuals using the Internet 1990-2018 (% of population)", subtitle = "Internet users are individuals who have used the Internet (from any location) in the last 3 months.\n The Internet can be used via a computer, mobile phone, personal digital assistant, games machine, digital TV etc.", y = "Individuals using the Internet (% of population)", x = "Year", caption = "Source: World Bank 2020, Data: International Telecommunication Union, World Telecommunication/ICT Development Report and database") +
+  geom_text(x= 2019, y = 82.04319, label = "France", size = 3, color= "pink") +
+  geom_text(x= 2019, y = 64.80387, label = "Morocco", size = 3, color= "red") +
+  geom_text(x= 2019, y = 88.16564, label = "Singapore", size = 3, color= "black") +
+  geom_text(x= 2019, y = 94.89674, label = "UK", size = 3, color= "gray") +
+  geom_text(x= 2018, y = 90.81109, label = "New Zealand", size = 3, color= "orange") +
+  geom_text(x= 2019, y = 89.35701, label = "Estonia", size = 3, color= "blue") +
+  geom_text(x= 2019, y = 99.65285, label = "Qatar", size = 3, color= "green") +
+  theme_map()
+
+internet
+```
+
+## Interest: Oregon Vocational Interest Scales (ORVIS) from the SAPA Project
+
+The ORVIS contains seven total scales: Leadership, Organization, Altruism, Creativity, Analysis, Production, Adventure, and Erudation. The Analysis scale is the scale of interest for this research. Ten items compose this scale, all of which are positively scored. The items are as follows:
+
+* Be a chemist
+* Design a laboratory experiment
+* Be a mathematician
+* Explain scientific concepts to others
+* Be a physicist
+* Carry out medical research
+* Be a scientific reporter
+* Solve complex puzzles
+* Develop a computer program
+* Be a statistician
+
+These data are a subet of the SAPA project. While the PISA dataset offer robust insights into the academic interests of fiften year-olds, less is known about adults' interests in these same areas. 
+
+```{r descriptive_stats, include=FALSE}
+# find gender break down
+SAPA_500 %>%
+  mutate(gender = forcats::fct_explicit_na(gender)) %>%
+  group_by(gender) %>%
+  summarize(N = n())
+
+# find mean, median, and range of age and sd
+median(SAPA_500$age) # 22
+mean(SAPA_500$age) # 26
+range(SAPA_500$age) # 14 - 90
+```
+
+Of the participants who selected a country that has 500 or more participants, 219,728 participants form the final dataset used for analysis. Participants choose between "male" and "female" to select their gender identity, with $63.52\%$ ($N = 139,567$) identifying as female and the other $36.48\%$ ($N = 80,162$) identifying as male. The median age of the particpants is 22, ranging from 14 to 90. 
+
+

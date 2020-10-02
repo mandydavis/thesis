@@ -86,13 +86,12 @@ theme_map <- function(...) {
 ##########################
 ##### load SAPA data #####
 ##########################
-
-load("/Users/mandydavis/Desktop/SAPA/SAPA.rdata")
+load("./data & analysis/data/SAPA/SAPA.rdata")
 # rename the monster
 SAPA <- SAPAdata18aug2010thru7feb2017
 rm(SAPAdata18aug2010thru7feb2017)
 # reset ItemLists with the file Bill provided (running this line will replace the existing one from the earlier load)
-load("~/Desktop/SAPA/ItemLists.rda")
+load("./data & analysis/data/SAPA/ItemLists.rda")
 
 
 
@@ -121,7 +120,7 @@ load("~/Desktop/SAPA/ItemLists.rda")
 
 
 # creates a table of the majors with a second column 'N' showing how many participants reported that major
-majors_tibble <- SAPAdata18aug2010thru7feb2017 %>%
+majors_tibble <- SAPA %>%
   mutate(major = forcats::fct_explicit_na(major)) %>%
   group_by(major) %>%
   summarize(N = n())
@@ -150,6 +149,14 @@ countries_tibble_500 <- filter(countries_tibble, N >= 500)
 
 # a new version of the SAPA data, which includes only those participants who are from countries that have >= 500 total participants
 SAPA_500 <- subset(SAPA, SAPA$country %in% countries_tibble_500$country)
+
+# merge SAPA_500 with GGGI data (we have SAPA data for 2010-2017, so select same years for GGGI)
+# update: there is no 2017 in the GGGI data (?), so the last year I include is 2016, as the SAPA data only goes through Feb 2017.
+ggi_raw <- read.csv("./data & analysis/data/ggi.csv", header = TRUE)
+# reduces the data frame to contain only the relevant data, aka the ggi index value
+ggi_index <- subset(ggi_raw, Indicator=='Overall Global Gender Gap Index' & Subindicator.Type== 'Index')
+# find average GGI from 2013-2018
+ggi_index$avg_ggi <- rowMeans(ggi_index[,10:16], na.rm = TRUE)
 
 # map of participant location, log transformed 
 countries_tibble <- merge(world, countries_tibble, by.x='iso_a3', by.y='country', all.x = TRUE)
@@ -200,8 +207,8 @@ ORVIS_scores <- char2numeric(scoreItems(keys = ItemLists[451:458], items = SAPA_
 
 
 # check some things
-dim(ORVIS_scores$scores)
-describe(ORVIS_scores$scores)
+# dim(ORVIS_scores$scores)
+# describe(ORVIS_scores$scores)
 
 ORVIS_gender <- data.frame(ORVIS_scores$scores, SAPA_500$gender)
 ORVIS_country <- data.frame(ORVIS_scores$scores, SAPA_500$country)
@@ -212,9 +219,6 @@ ORVIS_gen_country <- ORVIS_gen_country[c(9,1:8,10)] # switches the order -- come
 colnames(ORVIS_gen_country)[1] <- "gender"
 # spits out all the countries with their participant count (given the data we're using, SAPA_500):
 table(ORVIS_gen_country$country)
-
-# if is NaN change to NA
-ORVIS_gen_country[is.nan(ORVIS_gen_country)] <- NA
 
 # statsBy() function?
 sb <- statsBy(ORVIS_gen_country, ORVIS_gen_country$country, cors = TRUE)
@@ -237,6 +241,9 @@ sb <- statsBy(ORVIS_gen_country, "country", cors = TRUE)
 head(sb$within[,1:9])
 ORVIS_gen_by_country <- round(sb$within[,1:9], 2)
 # then clean up by sample size, plot outliers?
+
+# add gggi column 
+ORVIS_gggi <- data.frame(ORVIS_gen_by_country, ggi_index$Country.ISO3)
 
 pairs.panels(ORVIS_gen_by_country)
 
