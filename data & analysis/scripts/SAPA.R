@@ -191,64 +191,102 @@ ggplot(data = countries_tibble) +
 # scoreItems():
 
 ###   stepping stones: don't need to re-run   ###
-# rownames of ORVIS_items are the q #s of the ORVIS items (q_3102 to q_3193)
-ORVIS_items <- lookupItems("ORVIS", ItemInfo, search="ORVIS") # search for the columns labeled ORVIS
-# checks to make sure ORVIS items are in the SAPA dataset
-rownames(ORVIS_items) %in% colnames(SAPA_500) # all TRUE
-# find which columns of the SAPA data correspond to the ORVIS items
-which(colnames(SAPA_500) %in% rownames(ORVIS_items)) # 802 to 893
-which(rownames(ORVIS_items) %in% keys.list[1])
-# Variable names in keys are incorrectly specified?
+# # rownames of ORVIS_items are the q #s of the ORVIS items (q_3102 to q_3193)
+# ORVIS_items <- lookupItems("ORVIS", ItemInfo, search="ORVIS") # search for the columns labeled ORVIS
+# # checks to make sure ORVIS items are in the SAPA dataset
+# rownames(ORVIS_items) %in% colnames(SAPA_500) # all TRUE
+# # find which columns of the SAPA data correspond to the ORVIS items
+# which(colnames(SAPA_500) %in% rownames(ORVIS_items)) # 802 to 893
+# which(rownames(ORVIS_items) %in% keys.list[1])
+# # Variable names in keys are incorrectly specified?
 
 ###   now can score these scales (all scored in the same direction)   ###
 # 451:458 are the ORVIS scale keys
 ORVIS_scores <- char2numeric(scoreItems(keys = ItemLists[451:458], items = SAPA_500, impute = "none")) # need the char2numeric?
-# ORVIS_scores <- scoreItems(keys = ItemLists[451:458], items = SAPA_500, impute = "none") # char2numeric?
-
 
 # check some things
 # dim(ORVIS_scores$scores)
 # describe(ORVIS_scores$scores)
 
-ORVIS_gender <- data.frame(ORVIS_scores$scores, SAPA_500$gender)
-ORVIS_country <- data.frame(ORVIS_scores$scores, SAPA_500$country)
+ORVIS <- data.frame(ORVIS_scores$scores)
+ORVIS_an <- data.frame(ORVIS$ORVIS_Analytical)
+ORVIS_an$gender <- SAPA_500$gender
+ORVIS_an$country <- SAPA_500$country
 
-ORVIS_gen_country <- data.frame(ORVIS_gender, country=SAPA_500$country)
-# put gender as first row to makes things easier w statsby
-ORVIS_gen_country <- ORVIS_gen_country[c(9,1:8,10)] # switches the order -- come back to this
-colnames(ORVIS_gen_country)[1] <- "gender"
-# spits out all the countries with their participant count (given the data we're using, SAPA_500):
-table(ORVIS_gen_country$country)
+# convert the ORVIS scores to numeric, otherwise StatsBy will not work
+ORVIS_num <- char2numeric(ORVIS_an)
+colnames(ORVIS_num) <- c("ORVIS_an", "gender", "country")
 
-# statsBy() function?
-sb <- statsBy(ORVIS_gen_country, ORVIS_gen_country$country, cors = TRUE)
-# this found how much the countries differ
-names(sb)
-# rbg: r between groups
-# rwg: r within groups (pooled w in group corr)
-sb$r
-# ^ this gives us every correlation with ORVIS by each country
+sb_country <- statsBy(data = ORVIS_num, group = ORVIS_num$country, cors = TRUE)
+head(sb_country$within)
 
-# takes each of these correlations ^ as a vector
-# i care about orvis_p with gender
-head(sb$within)
+# # can reduce the number of cols for simplicity if you wish
+# sb_country_test <- statsBy(data = ORVIS_num[1:2], group = ORVIS_num$country, cors = TRUE)
+# # CI of each cor 
+# sb_country_test$r.ci
+# # plot of correlations and standard errors not working
+# error.dots(sb_country_test$within)
 
-# this is working but I don't know why. Not working for having country in the mix 
-sb <- statsBy(ORVIS_gender, "SAPA_500.gender", cors = TRUE)
-sb <- statsBy(ORVIS_country, "SAPA_500.country", cors = TRUE)
-sb <- statsBy(ORVIS_gen_country, "country", cors = TRUE)
-# get rid of the cors that aren't relevant
-head(sb$within[,1:9])
-ORVIS_gen_by_country <- round(sb$within[,1:9], 2)
-# then clean up by sample size, plot outliers?
+# find the countries that have both gggi and orvis_an data
+orvis_22 <- subset(orvis_final, subset = orvis_final$select_names %in% gggi_29$Country.ISO3)
+gggi_29 <- subset(ggi_index, subset = ggi_index$Country.ISO3 %in% select_names)
 
-# add gggi column 
-ORVIS_gggi <- data.frame(ORVIS_gen_by_country, ggi_index$Country.ISO3)
+# merge ORVIS_an with gggi average
+ORVIS_gggi <- data.frame(orvis_22, gggi_29$avg_ggi)
 
-pairs.panels(ORVIS_gen_by_country)
+# CIs are wrong. 
+ggplot(ORVIS_gggi, aes(x = gggi_29.avg_ggi, y = ORVIS.gendr)) +
+  geom_smooth()
 
-# make sure this is okay -- got things like "ORVIS_P-ORVIS_Ad" instead of just ORVIS_P
+gggi_29 <- subset(ggi_index, subset = ggi_index$Country.ISO3 %in% select_names)
 
+# confidence interval of each country: 
+test <- sb_country$r.ci
+
+
+
+##########################
+######### notes ##########
+##########################
+
+# negative corerlation means males are higher
+# female = 2, male = 1
+
+
+##########################
+######## discard #########
+##########################
+
+# delete, pretty sure
+# ORVIS_num$gender <- SAPA_500$gender
+# ORVIS_num$country <- SAPA_500$country
+
+# # earlier attempt. likely discard.
+# ORVIS_gen_country <- data.frame(ORVIS_gender, country=SAPA_500$country)
+# # put gender as first row to makes things easier w statsby
+# ORVIS_gen_country <- ORVIS_gen_country[c(9,1:8,10)] # switches the order -- come back to this
+# colnames(ORVIS_gen_country)[1] <- "gender"
+# # spits out all the countries with their participant count (given the data we're using, SAPA_500):
+# table(ORVIS_gen_country$country)
+# # statsBy() function?
+# sb <- statsBy(data = ORVIS_gen_country, group = ORVIS_gen_country$country, cors = TRUE)
+# # this found how much the countries differ
+# names(sb)
+# # rbg: r between groups
+# # rwg: r within groups (pooled w in group corr)
+# sb$r
+# # ^ this gives us every correlation with ORVIS by each country
+# # takes each of these correlations ^ as a vector
+# # i care about orvis_p with gender
+# head(sb$within)
+# # this is working but I don't know why. Not working for having country in the mix 
+# sb <- statsBy(ORVIS_gender, "SAPA_500.gender", cors = TRUE)
+# sb <- statsBy(ORVIS_country, "SAPA_500.country", cors = TRUE)
+# sb <- statsBy(ORVIS_gen_country, "country", cors = TRUE)
+# # get rid of the cors that aren't relevant
+# head(round((sb$within[,1:9])))
+# ORVIS_gen_by_country <- round(sb$within[,1:9], 2)
+# # then clean up by sample size, plot outliers?
 
 
 
