@@ -8,8 +8,8 @@ documentclass: book
 bibliography: [ict-gep.bib]
 citation-style: apa.csl
 link-citations: yes
-github-repo: mandydavis/ict-gep-re-analysis
-description: "An overview and tour of the steps taken to re-analyze the ICT Gender-Equality Paradox."
+github-repo: mandydavis/thesis
+description: "Probing the ICT Gender-Equality Paradox."
 ---
 
 ```{r setup, include=FALSE}
@@ -29,6 +29,8 @@ library(gtable)
 library(dplyr)
 library(forcats)
 require(devtools)
+library(cowplot)
+library(magick)
 
 # necessary mapping packages
 theme_set(theme_bw())
@@ -112,11 +114,11 @@ theme_pie <- function(...) {
       # panel.grid.major = element_line(color = "#dbdbd9", size = 0.2),
       panel.grid.minor = element_blank(),
       # background colors
-      plot.background = element_rect(fill = default_background_color,
+      plot.background = element_rect(fill = "white",
                                      color = NA),
-      panel.background = element_rect(fill = default_background_color,
+      panel.background = element_rect(fill = "white",
                                       color = NA),
-      legend.background = element_rect(fill = default_background_color,
+      legend.background = element_rect(fill = "white",
                                        color = NA),
       # borders and margins
       plot.margin = unit(c(.5, .5, .2, .5), "cm"),
@@ -181,7 +183,70 @@ ggi_index$avg_ggi <- rowMeans(ggi_index[,10:16], na.rm = TRUE)
 
 # Exploratory Data Analysis
 
-## ICT Graduation Trends (Country Comparison)
+## The Paradox
+Gender equality (as measured by the Global Gender Gap Index) is moderately, negatively correlated with the  percentage of women among ICT, adjusted for equal graduation numbers of men and women ($r = -0.47$, $p < 0.001$).
+
+```{r paradox, echo=FALSE, message=FALSE, warning=FALSE}
+# ict data 
+# source:  http://data.uis.unesco.org/Index.aspx?DataSetCode=EDULIT_DS&popupcustomise=true&lang=en#
+# path from source to data: education --> completion --> percentage of tertiary graduates --> percentage of female graduates by field of study
+# note on country codes: to join the various data frames, it essential to include the iso_a3 coutnry codes in each of the original data frames,
+# so be sure to select 'customise' --> 'table options' and finally, check the box to use codes for country
+ict_raw <- read.csv("./data & analysis/data/ict.csv")
+# the distinct country codes in case you need them
+ict_countries <- levels(ict_raw[,'LOCATION'])
+# get average across all years that each country has data for (2013-2019)
+ict_averages <- aggregate(ict_raw[,'Value'], list(ict_raw$LOCATION), mean)
+# rename columns
+colnames(ict_averages) <- c('iso_a3', 'average_ict')
+
+# percent_of_women data
+percent_of_women <- read.csv("./data & analysis/data/percent_of_women.csv", header = TRUE)
+percent_of_women <- subset(percent_of_women, Indicator == 'Percentage of female graduates from tertiary education graduating from Information and Communication Technologies programmes, female (%)')
+percent_of_women_avg <- aggregate(percent_of_women[,'Value'], list(percent_of_women$LOCATION), mean)
+# percent_of_men data
+percent_of_men <- read.csv("./data & analysis/data/percent_of_men.csv", header = TRUE)
+percent_of_men <- subset(percent_of_men, Indicator == 'Percentage of male graduates from tertiary education graduating from Information and Communication Technologies programmes, male (%)')
+percent_of_men_avg <- aggregate(percent_of_men[,'Value'], list(percent_of_men$LOCATION), mean)
+# add a/(a+b) column
+percent_of_ict_adjusted <- percent_of_women_avg
+percent_of_ict_adjusted$b <- percent_of_men_avg[,'x']
+colnames(percent_of_ict_adjusted) <- cs(iso_a3, a, b)
+# add a column for the percent_of_ict adjusted percentage
+percent_of_ict_adjusted$adjusted <- 100*percent_of_ict_adjusted[,'a']/(percent_of_ict_adjusted[,'a']+percent_of_ict_adjusted[,'b'])
+# add a column for the disparity percentage
+percent_of_ict_adjusted$disparity <- percent_of_ict_adjusted[,'a'] - percent_of_ict_adjusted[,'b']
+
+
+# percent_of_ict data + gggi data
+ict_ggi <- merge(ict_averages, ggi_index, by.x='iso_a3', by.y='Country.ISO3')
+
+# append the gggi data
+ict_ggi_adjusted <- merge(percent_of_ict_adjusted, ggi_index, by.x='iso_a3', by.y='Country.ISO3')
+
+# The formula used for calculating the propensity of women to graduate with STEM degrees was a /(a + b), 
+# where a is the percentage of women who graduate with STEM [ICT] degrees (relative to all women graduating) and b is the percentage 
+# of men who graduate with STEM [ICT] degrees (relative to all men graduating).
+
+# so that we can label the dots with the actual country name
+rownames(ict_ggi_adjusted) <- ict_ggi_adjusted[,'Country.Name']
+
+# plot it
+ggplot(ict_ggi_adjusted, aes(x=avg_ggi, y=adjusted, label = rownames(ict_ggi_adjusted))) + 
+  geom_label(size = 2) +
+  scale_color_distiller(palette = "YlGn", type = "seq", direction = -1) +
+  geom_smooth(method=lm) +
+  labs(x = 'Global Gender Gap Index (GGGI) (2013-2018)',
+       y = 'Expected percent of women among ICT graduates, accounting for\n gender differences in overall graduation numbers',
+       title = "ICT Gender Equality Paradox",
+       subtitle = "Adjusting for gender differences in overall graduation numbers",
+       caption = "Data: UNESCO Institute For Statistics, displaying the average of a country's available data from 2013-2019") +
+  theme_map() + theme(axis.title=element_text(size=8), axis.text.x = element_text(), axis.text.y = element_text())
+```
+
+## ICT Graduation Rates in 7 Countries
+**[in progress]** I am working on creating the visualization for all seven countries so that I can stack them and demonstrate the disconnect there can be between the overall ratio of men and women graduates and the *percentage of all men and all women* who pursue ICT.
+
 ```{r ICT_pies, echo=FALSE, warning=FALSE, message=FALSE}
 ####### visualize degree popularity (what % of all women and men tertiary graduates studied ICT?):
 percent_of_women <- read.csv("./data & analysis/data/percent_of_women.csv")
@@ -228,7 +293,7 @@ QAT_p_of_ICT <- ggplot(QAT_percent_ICT, aes(x = "", y = percent, fill = gender))
   coord_polar("y", start = 0) + 
   geom_label(aes(label = paste((round(percent, digits = 1)), "%")), position = position_stack(vjust = 0.5), show.legend = FALSE, size = 5) +
   scale_fill_manual(values = c("#1FBFC3", "#F57670")) +
-  labs(x= NULL, y = NULL, title = "% of ICT tertiary graduates who are..") +
+  labs(x= NULL, y = NULL, title = "% of ICT graduates who are..") +
   theme_pie()
 
 # Qatar percent of women
@@ -330,22 +395,38 @@ GBR_p_of_men_plot <- ggplot(GBR_percent_of_m, aes(x = "", y = percent, fill = de
 
 ```
 
-### Qatar
-```{r qatar_pie, echo=FALSE, warning=FALSE, message=FALSE}
-grid.arrange(QAT_p_of_ICT, QAT_p_of_women_plot, QAT_p_of_men_plot, nrow = 1)
+```{r flagtest, echo=FALSE, warning=FALSE, message=FALSE}
+qatar_flag <- ggdraw() + draw_image("./assets/qatar.png") + draw_label("Qatar", vjust = -2.5, fontfamily = "Tahoma", size = 26)
+# grid.arrange(qatar_flag, QAT_p_of_ICT, nrow = 1)
+
+grid.arrange(qatar_flag, QAT_p_of_ICT, QAT_p_of_women_plot, QAT_p_of_men_plot, nrow = 1)
+
 ```
 
-### Morocco
-```{r morocco_pie, echo=FALSE, warning=FALSE, message=FALSE}
-grid.arrange(MAR_p_of_ICT, MAR_p_of_women_plot, MAR_p_of_men_plot, nrow = 1)
-```
+<!-- ### grid.arrange test -->
+<!-- ```{r tworows, echo=FALSE, warning=FALSE, message=FALSE} -->
+<!-- grid.arrange(QAT_p_of_ICT, QAT_p_of_women_plot, QAT_p_of_men_plot, QAT_p_of_ICT, QAT_p_of_women_plot, QAT_p_of_men_plot, nrow = 2) -->
+<!-- ``` -->
 
-### United Kingdom
-```{r uk_pie, echo=FALSE, warning=FALSE, message=FALSE}
-grid.arrange(GBR_p_of_ICT, GBR_p_of_women_plot, GBR_p_of_men_plot, nrow = 1)
-```
+
+<!-- ### Qatar -->
+<!-- ```{r qatar_pie, echo=FALSE, warning=FALSE, message=FALSE} -->
+<!-- grid.arrange(QAT_p_of_ICT, QAT_p_of_women_plot, QAT_p_of_men_plot, nrow = 1) -->
+<!-- ``` -->
+
+<!-- ### Morocco -->
+<!-- ```{r morocco_pie, echo=FALSE, warning=FALSE, message=FALSE} -->
+<!-- grid.arrange(MAR_p_of_ICT, MAR_p_of_women_plot, MAR_p_of_men_plot, nrow = 1) -->
+<!-- ``` -->
+
+<!-- ### United Kingdom -->
+<!-- ```{r uk_pie, echo=FALSE, warning=FALSE, message=FALSE} -->
+<!-- grid.arrange(GBR_p_of_ICT, GBR_p_of_women_plot, GBR_p_of_men_plot, nrow = 1) -->
+<!-- ``` -->
 
 ## ICT Graduation Trends (Change Over Time)
+Less data than I would prefer, but that's helpful info too!
+
 ```{r ICT_change, echo=FALSE, warning=FALSE}
 ###    change over time    ###
 country_codes <- c("QAT","MAR","SGP","EST","NZL","GBR","FRA")
@@ -390,7 +471,7 @@ ICT_change <- ggplot(ICT_circ_df, aes(x = year)) +
   geom_line(aes(y = as.numeric(as.character(GBR))), group = 1, color = 'gray') +
   geom_line(aes(y = as.numeric(as.character(NZL))), group = 1, color = 'orange') +
   geom_line(aes(y = as.numeric(as.character(SGP))), group = 1, color = 'black') +
-  labs(title = "Change in the percent of ICT tertiary graduates who are women over time", subtitle = "subtitle goes here", y= "percent of ICT tertiary graduates who are women") +
+  labs(title = "Change in the percent of ICT tertiary graduates who are women over time", y= "Percent of ICT tertiary graduates who are women") +
   geom_text(x= 2016.25, y = 16.45824, label = "France", size = 3, color= "pink") +
   geom_text(x= 2017.25, y = 41.28349, label = "Morocco", size = 3, color= "red") +
   geom_text(x= 2017.3, y = 32.22160, label = "Singapore", size = 3, color= "black") +
@@ -405,6 +486,7 @@ ICT_change
 ```
 
 ## Internet Usage
+This is another reason I am so interested in comparing Qatar and Morocco.
 
 ```{r internet, echo=FALSE, warning=FALSE}
 internet_usage <- read_excel("./data & analysis/data/Internet Usage downloaded 08.24.20 (World Bank)/internet_usage.xls")
@@ -453,6 +535,12 @@ internet
 
 ## Interest: Oregon Vocational Interest Scales (ORVIS) from the SAPA Project
 
+A common argument for why the STEM and ICT Gender-Equality paradoxes might exist surrounds the level of interest women have in the subjects. In countries with a high level of gender equality, some argue, women are free to pursue what they truly are interested in, even if those fields are less lucrative. 
+
+In their controversial paper, Stoet & Geary examined this using the Programme for International Student Assessment (PISA) dataset. Interest is also important because of its relationship with achievement. The PISA data is valuable for understanding the interests of 15-year-olds who live in OECD countries, however, it lack insight on the interests of adults. 
+
+The Synthetic Aperture Personality Assessment (SAPA) collects data that can fill that gap. SAPA is an online survey created by Northwestern psychologist William Revelle that anyone with access to a web browser and internet connection can take (https://www.sapa-project.org/). The Oregon Vocational Interest Scales (ORVIS) are a component of SAPA.
+
 The ORVIS contains seven total scales: Leadership, Organization, Altruism, Creativity, Analysis, Production, Adventure, and Erudation. The Analysis scale is the scale of interest for this research. Ten items compose this scale, all of which are positively scored. The items are as follows:
 
 * Be a chemist
@@ -465,8 +553,6 @@ The ORVIS contains seven total scales: Leadership, Organization, Altruism, Creat
 * Solve complex puzzles
 * Develop a computer program
 * Be a statistician
-
-These data are a subet of the SAPA project. While the PISA dataset offer robust insights into the academic interests of fiften year-olds, less is known about adults' interests in these same areas. 
 
 ```{r descriptive_stats, include=FALSE}
 # find gender break down
@@ -481,6 +567,68 @@ mean(SAPA_500$age) # 26
 range(SAPA_500$age) # 14 - 90
 ```
 
-Of the participants who selected a country that has 500 or more participants, 219,728 participants form the final dataset used for analysis. Participants choose between "male" and "female" to select their gender identity, with $63.52\%$ ($N = 139,567$) identifying as female and the other $36.48\%$ ($N = 80,162$) identifying as male. The median age of the particpants is 22, ranging from 14 to 90. 
+Of the people who took the SAPA test from August 18, 2010 through February 7, 2017, 219,728 indicated they are from a country that ended up having 500 or more subjects during that time period. These people form the final dataset used for analysis. Participants choose between "male" and "female" to select their gender identity, with $63.52\%$ ($N = 139,567$) identifying as female and the other $36.48\%$ ($N = 80,162$) identifying as male. The median age of the particpants is 22, ranging from 14 to 90. 
 
+Below is a visualization of how these participants scored on their level of analytical interest.
+
+
+```{r orvis_both, echo=FALSE, message=FALSE, warning=FALSE}
+#### find the correlation between women's orvis_an scores and gggi ####
+# 451:458 are the ORVIS scale keys
+ORVIS_scores <- char2numeric(scoreItems(keys = ItemLists[451:458], items = SAPA_500, impute = "none")) # need the char2numeric?
+ORVIS <- data.frame(ORVIS_scores$scores)
+ORVIS_an <- data.frame(ORVIS$ORVIS_Analytical)
+ORVIS_an$gender <- SAPA_500$gender
+ORVIS_an$country <- SAPA_500$country
+
+# filter data to just women
+ORVIS_an_women <- subset(ORVIS_an, gender == "female")
+colnames(ORVIS_an_women) <- c("ORVIS_an", "gender", "country")
+# exclude NaN results
+ORVIS_an_women <- subset(ORVIS_an_women, is.nan(ORVIS_an_women$ORVIS_an) == FALSE)
+# 
+# find average for each country? or is that bad bc then get rid of se?
+ORVIS_an_women_avg <- aggregate(ORVIS_an_women[,'ORVIS_an'], list(ORVIS_an_women$country), mean)
+colnames(ORVIS_an_women_avg) <- c("Country.ISO3", "ORVIS_an_avg")
+# join the two dataframes
+ORVIS_an_women_final <- inner_join(ORVIS_an_women_avg, ggi_index, by = "Country.ISO3")
+
+ORVIS_an_men <- subset(ORVIS_an, gender == "male")
+colnames(ORVIS_an_men) <- c("ORVIS_an", "gender", "country")
+# exclude NaN results
+ORVIS_an_men <- subset(ORVIS_an_men, is.nan(ORVIS_an_men$ORVIS_an) == FALSE)
+# 
+# find average for each country? or is that bad bc then get rid of se?
+ORVIS_an_men_avg <- aggregate(ORVIS_an_men[,'ORVIS_an'], list(ORVIS_an_men$country), mean)
+colnames(ORVIS_an_men_avg) <- c("Country.ISO3", "ORVIS_an_avg")
+# join the two dataframes
+ORVIS_an_men_final <- inner_join(ORVIS_an_men_avg, ggi_index, by = "Country.ISO3")
+
+#### now, overlay the men's and women's correlations to view the opposite-ness ####
+ORVIS_an_both <- ORVIS_an_men_final
+ORVIS_an_both$ORVIS_an_women <- ORVIS_an_women_final$ORVIS_an_avg
+# plot it
+ggplot(ORVIS_an_both) +
+  geom_smooth(aes(x = avg_ggi, y = ORVIS_an_avg), colour = "blue") + 
+  geom_smooth(aes(x = avg_ggi, y = ORVIS_an_women), colour = "red") + 
+  labs(title = "Relationship between men's and women's analytical interest and gender equality", 
+       x = "Average GGGI, 2013-2016", y = "Average level of analytical interest, 2010-2017") +
+  geom_text(x= 0.6, y = 3.5, label = "men", size = 3, color= "blue") +
+  geom_text(x= 0.6, y = 2.85, label = "women", size = 3, color= "red", angle = 20) +
+  theme_map()
+
+```
+
+Next up is the same graph, but only for women's interest and with country names included for reference.
+
+```{r interest_country, echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(ORVIS_an_men_final, aes(x = avg_ggi, y = ORVIS_an_avg)) +
+  geom_smooth() + geom_label(aes(label = Country.Name)) + 
+  labs(title = "Relationship between women's analytical interest and gender equality", 
+       x = "Average GGGI, 2013-2016", y = "Average level of analytical interest, 2010-2017") +
+  theme_map()
+```
+
+
+**What does this mean?** I don't know (yet). There seems to be no clear correlation like that of the ICT-GEP. However, it almost appears that men's and women's interest are inversely proportional, which is a really interesting lead, as men's and women's interest are theoretically independent and have no cap. Contrast this to the proportion of men and women there are in a given classroom—the proportions are dependent upon one another, so we would expect this relationship. In this situation, however, a relationship like this is not expected (without considering the broader context).
 

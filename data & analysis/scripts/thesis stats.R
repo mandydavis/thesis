@@ -1,3 +1,8 @@
+# TO DO #
+# path.chain package to save time in the future
+
+install.packages("magick")
+
 library(readxl)
 library(ggplot2)
 library(psych)
@@ -5,12 +10,16 @@ library(psychTools)
 library(reshape2)
 library(janitor)
 library(tidyverse)
-# install.packages("rlist")
 library(ggrepel)
 library(directlabels)
 library(ggforce)
 library(gridExtra)
-library(gtable)
+# library(gtable)
+# library(plotly)
+# library(ggflags)
+library(cowplot)
+library(magick)
+
 
 # set theme for maps
 # set defaults
@@ -81,11 +90,11 @@ theme_pie <- function(...) {
       # panel.grid.major = element_line(color = "#dbdbd9", size = 0.2),
       panel.grid.minor = element_blank(),
       # background colors
-      plot.background = element_rect(fill = default_background_color,
+      plot.background = element_rect(fill = "white",
                                      color = NA),
-      panel.background = element_rect(fill = default_background_color,
+      panel.background = element_rect(fill = "white",
                                       color = NA),
-      legend.background = element_rect(fill = default_background_color,
+      legend.background = element_rect(fill = "white",
                                        color = NA),
       # borders and margins
       plot.margin = unit(c(.5, .5, .2, .5), "cm"),
@@ -172,19 +181,23 @@ colnames(percent_of_men) <- c("iso_a3", "percent_of_men")
 # combine the percent_of_women and percent_of_men tables
 percent_of_gender <- inner_join(percent_of_women, percent_of_men, by = "iso_a3")
 
-# a function that creates a ICT vs Other Degree pie chart for any country in the dataset
-# TO DO !!!!
-
 # Morocco Gender Ratio of Tertiary ICT Degrees Awarded
 
 # load ICT data
 ict_raw <- read.csv("./data & analysis/data/ict.csv")
 # the distinct country codes in case you need them
 ict_countries <- levels(ict_raw[,'LOCATION'])
+# the subset we need
+country_codes <- c("QAT","MAR","SGP","EST","NZL","GBR","FRA")
 # get average across all years that each country has data for (2013-2019)
 ict_averages <- aggregate(ict_raw[,'Value'], list(ict_raw$LOCATION), mean)
 # rename columns
 colnames(ict_averages) <- c('iso_a3', 'average_ICT_w')
+
+# add avg ict (percent of ict who are women) to the percent_of_gender df
+percent_of_gender$percent_of_ict <- subset(ict_averages, subset = country_codes %in% toString(ict_averages["iso_a3"]))$average_ICT_w
+
+
 average_ICT_w <- subset(ict_averages, subset = ict_averages["iso_a3"] == "QAT")$average_ICT_w
 QAT_percent_ICT <- data.frame("gender" = c("Women", "Men"), "percent" = c(average_ICT_w, 100 - average_ICT_w))
 
@@ -223,7 +236,58 @@ QAT_p_of_men_plot <- ggplot(QAT_percent_of_m, aes(x = "", y = percent, fill = de
 
 # combine the two charts
 qatar_pie <- grid.arrange(QAT_p_of_ICT, QAT_p_of_women_plot, QAT_p_of_men_plot, nrow = 1)
-qatar_pie <- ggplotGrob(qatar_pie)
+qatar_pie2 <- grid.arrange(QAT_p_of_ICT + labs(title = NULL) + theme(legend.position = "none"), QAT_p_of_women_plot + labs(title = NULL) + theme(legend.position = "none"), QAT_p_of_men_plot + labs(title = NULL) + theme(legend.position = "none"), nrow = 1)
+qatar_pie_test <- grid.arrange(qatar_pie, qatar_pie2, nrow = 2)
+
+
+grid.arrange(qatar_flag, QAT_p_of_ICT, QAT_p_of_women_plot, QAT_p_of_men_plot, qatar_flag, QAT_p_of_ICT, QAT_p_of_women_plot, QAT_p_of_men_plot, nrow = 2)
+
+
+qatar_flag <- ggdraw() + draw_image("./assets/qatar.png") + draw_label("Qatar", vjust = -4.5, fontfamily = "Tahoma", size = 26)
+grid.arrange(qatar_flag, QAT_p_of_ICT, nrow = 1)
+
+grid.arrange(c(qatar_flag,QAT_p_of_ICT, QAT_p_of_women_plot))
+
+
+my_plot_func <- function(dat, x_var) {
+  p <-  ggplot(dat, aes(fct_rev(fct_infreq(.data[[x_var]])))) +
+    geom_bar(stat = "count") +
+    labs(subtitle = x_var) +
+    coord_flip()
+  
+  ggsave(paste0(x_var, "plot.svg", device = "svg")
+         return(p)
+}
+
+
+my_plot_func <- function(dat, x_var) {
+  # create pie chart (% of ICT graduates who are women)
+  p_of_ict_pie <- ggplot(QAT_percent_ICT, aes(x = "", y = percent, fill = gender)) +
+    geom_bar(width = 1, stat = "identity") +
+    coord_polar("y", start = 0) + 
+    geom_label(aes(label = paste((round(percent, digits = 1)), "%")), position = position_stack(vjust = 0.5), show.legend = FALSE, size = 5) +
+    scale_fill_manual(values = c("#1FBFC3", "#F57670")) +
+    labs(x= NULL, y = NULL, title = "% of ICT tertiary graduates who are women") +
+    theme_pie()
+}
+
+
+
+
+
+
+
+
+var_names <- colnames(dat)
+plot_list <- var_names %>% 
+  map(~ my_plot_func(dat, .x))
+plot_list 
+
+
+
+
+
+
 
 # function to do this for the rest:
 country_pie_charts <- function(country_codes) {

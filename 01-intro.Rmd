@@ -1,6 +1,6 @@
-# Visualizing the ICT-GEP {#maps}
+# Mapping the ICT-GEP {#maps}
 
-```{r setup, include=FALSE}
+```{r setup2, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
 library(psych)
@@ -98,7 +98,7 @@ theme_map <- function(...) {
 # path from source to data: education --> completion --> percentage of tertiary graduates --> percentage of female graduates by field of study
 # note on country codes: to join the various data frames, it essential to include the iso_a3 coutnry codes in each of the original data frames,
 # so be sure to select 'customise' --> 'table options' and finally, check the box to use codes for country
-ict_raw <- read.csv("./data & R script/data/ict.csv")
+ict_raw <- read.csv("./data & analysis/data/ict.csv")
 # the distinct country codes in case you need them
 ict_countries <- levels(ict_raw[,'LOCATION'])
 # get average across all years that each country has data for (2013-2019)
@@ -142,7 +142,7 @@ Note the visual reversal of colors when comparing the ICT map to the GGGI map. T
 # ggi (2013-2019) + world !!!
 # data download: https://tcdata360-backend.worldbank.org/api/v1/datasets/743/dump.csv
 # data hub: https://tcdata360.worldbank.org/indicators/af52ebe9?country=BRA&indicator=27959&viz=line_chart&years=2006,2018
-ggi_raw <- read.csv("./data & R script/data/ggi.csv", header = TRUE)
+ggi_raw <- read.csv("./data & analysis/data/ggi.csv", header = TRUE)
 # reduces the data frame to contain only the relevant data, aka the ggi index value for 2018
 ggi_index <- subset(ggi_raw, Indicator=='Overall Global Gender Gap Index' & Subindicator.Type== 'Index')
 # find average GGI from 2013-2018
